@@ -24,14 +24,48 @@ weapon_list = ['short-sword 100 10 1 1 no',
                ]
 
 def register(user):
-    _status = []
-    _status.append('critmult-1')
-    _status.append('health-100')
-    weapons = []
-    potions = []
-    items = []
-    _dict = dict(status=_status, inventory=[weapons, potions, items],clan=random.choice(clan_list))
-    rpg_players[user] = _dict
-    return 'registered'
+    if user not in rpg_players:
+        _status = []
+        _status.append('critmult-1')
+        _status.append('health-100')
+        weapons = []
+        potions = []
+        items = []
+        _clan = random.choice(clan_list)
+        money = 100
+        _dict = dict(status=_status, inventory=[weapons, potions, items, money], clan=_clan)
+        rpg_players[user] = _dict
+        return 'registered in clan ' + _clan
+    else:
+        return 'you are already registered'
+
+def buy(arg):
+    arg, item = arg.split(' ',1)
+    item = item.split()
+    try:
+        amount = int(item[-1])
+        item.remove(item[-1])
+    except: amount = 1
+    _name = '-'.join(item)
+    _inv, potions, items, money = rpg_players['herenti']['inventory']
+    if arg == 'weapon':
+        for i in weapon_list:
+            i = i.split()
+            if i[0] == _name:
+                cost = int(i[1])
+                ammo = i[5]
+                if i[5] == 'yes':
+                    ammo = '10'
+                break
+        cost *= amount
+        if money >= cost:
+            money -= cost
+            _inv.append(_name+ ' ' +ammo)
+        else:
+            return 'not enough money'
+        rpg_players['herenti']['inventory'] = _inv, potions, items, money
+
+register('herenti')
+    
     
 

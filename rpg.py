@@ -81,9 +81,7 @@ def equip(weapon, user):
         return 'equipped ' + weapon
     except:
         return 'you do not have that weapon'
-        
-        
-
+    
 def buy(arg, user):
     try:
         rpg_players[user]

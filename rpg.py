@@ -26,16 +26,16 @@ weapon_dict = {'unarmed': '0 5 1 1 no 1',
                'fury bow': '500 45 1.6 6 yes 10'
                }
 
-potion_dict = {'health potion s': '20 25',
-               'health potion m': '40 50',
-               'health potion l': '80 100',
-               'health potion xl': '160 200',
-               'elixer': '400 500',
-               'godsgrow extract': '1000 1000',
-               'peerless health potion': '2500 3000',
-               'accuracy potion': '100 0.1',
-               'peerless accuracy potion': '500 0.2',
-               'critmult potion': '100 0.2'
+potion_dict = {'health s': '20 25 health',
+               'health m': '40 50 health',
+               'health l': '80 100 health',
+               'health xl': '160 200 health',
+               'elixer': '400 500 health',
+               'godsgrow': '1000 1000 health',
+               'peerless health': '2500 3000 health',
+               'accuracy': '100 0.1 accuracy',
+               'peerless accuracy': '500 0.2 accuracy',
+               'crit': '2000 0.2 critchance'
                }
 
 item_dict = {'condom':'it might be used 100',
@@ -50,11 +50,12 @@ item_dict = {'condom':'it might be used 100',
              'ethirium pendant':'very rare material of a mysterious nature 100000',
              'royal crest':'those with this crest will now have a royal title 1000000'
              }
-             
+    
 def _register(user):
     if user not in rpg_players:
-        _status = dict(critchance=0.07, health=100, level=1, timeout=time.time(), exp=0, accuracy=0.75, marriage={})
+        _status = dict(critchance=0.07, health=100, level=1, attack_timeout=time.time(), exp=0, accuracy=0.75, marriage={}, effects={})
         _inventory = dict(weapons={'unarmed':[1, 'equipped']}, potions={}, items={}, money=150)
+        skills = dict()
         _clan = random.choice(clan_list)
         _dict = dict(status=_status, inventory=_inventory, clan=_clan)
         rpg_players[user] = json.dumps(_dict)
@@ -63,6 +64,45 @@ def _register(user):
     else:
         return 'you are already registered'
 
+def _item(arg, user):
+    try:
+        try:
+            _dict = json.loads(rpg_players[user])
+        except:
+            return 'you are not registered yet'
+        try: arg, item = arg.split(' ',1)
+        except: arg, item = arg, ''
+        if arg == 'list':
+            i = 'your items are: '+', '.join([i for i in _dict['inventory']['items']])
+            return i
+        if arg == 'info':
+            _item = ' '.join(item_dict[item].split()[:-1])
+            return item+': '+_item
+    except: return 'invallid'
+
+def _potion(arg, user):
+    try:
+        _dict = json.loads(rpg_players[user])
+    except:
+        return 'you are not registered yet'
+    arg, item = arg.split(' ',1)
+    if arg == 'drink':
+        if _dict['inventory']['potions'][item] <= 0:
+            return 'you are out of that potion'
+        else:
+            _dict['inventory']['potions'][item] -= 1
+            if _dict['inventory']['potions'][item] <= 0:
+                del _dict['inventory']['potions'][item]
+            info = potion_dict[item].split()
+            effect = info[2]
+            val = info [1]
+            if effect =='health': _dict['status']['health'] += int(val)
+            else: _dict['status']['effects'][effect] = [time.time(), val]
+            _dict['status']['exp'] += 5
+            rpg_players[user] = json.dumps(_dict)
+            dumprpg()
+            return 'drank '+item+' potion'
+                    
 def _attack(user, _user):
     _dict = json.loads(rpg_players[user])
     __dict = json.loads(rpg_players[_user])
@@ -79,13 +119,41 @@ def _attack(user, _user):
     base_damage = int(_stats[1])
     attack_rate = int(_stats[2])*5
     if attack_rate > 10000: attack_rate = 10000
-    timeout = time.time() - __dict['status']['timeout']
+    timeout = time.time() - __dict['status']['attack_timeout']
     if timeout < attack_rate:
-        return 'you find yourself unable to attack fast enough'
+        return 'you find yourself unable to attack fast enough [%s seconds]' % str(round(attack_rate -  timeout))
     needs_ammo = _stats[4]
     max_damage = base_damage * 3.5
     accuracy = __dict['status']['accuracy']
     critchance = __dict['status']['critchance']
+    try:
+        _critchance = __dict['status']['effects']['critchance']
+        _timeout = _critchance[0]
+        _timeout = time.time() - _timeout
+        if _timeout > 600:
+            del __dict['status']['effects']['critchance']
+        else:
+            critchance += round(float(_critchance[1]), 1)
+    except: pass
+    try:
+        _accuracy = __dict['status']['effects']['accuracy']
+        print('accuracy')
+        _timeout = _accuracy[0]
+        _timeout = time.time() - _timeout
+        if _timeout > 600:
+            del __dict['status']['effects']['accuracy']
+        else:
+            accuracy += round(float(_accuracy[1]), 1)
+    except: pass
+    try:
+        _invisibility = _dict['status']['effects']['invisibility']
+        _timeout = _invisibility
+        _timeout = time.time() - _timeout
+        if _timeout > 600:
+            del __dict['status']['effects']['invisibility']
+        else:
+            accuracy -= 0.35
+    except: pass
     crit = False
     killed = False
     def hit_chance(i):
@@ -97,7 +165,10 @@ def _attack(user, _user):
         hit = random.choice(part)
         return hit
     if hit_chance(accuracy) == 'n':
-        __dict['status']['timeout'] = time.time()
+        __dict['status']['attack_timeout'] = time.time()
+        rpg_players[_user] = json.dumps(__dict)
+        rpg_players[user] = json.dumps(_dict)
+        dumprpg()
         return 'you missed!!!'
     if hit_chance(critchance) == 'y':
         crit = True
@@ -114,7 +185,7 @@ def _attack(user, _user):
         level = level*5
         _exp += level
     __dict['status']['exp'] += _exp
-    __dict['status']['timeout'] = time.time()        
+    __dict['status']['attack_timeout'] = time.time()        
     rpg_players[user] = json.dumps(_dict)
     rpg_players[_user] = json.dumps(__dict)
     dumprpg()
@@ -210,8 +281,9 @@ def _rpgstats(user, _user):
     level = str(_dict['status']['level'])
     exp = str(_dict['status']['exp'])
     health = str(_dict['status']['health'])
-    if _rel == '': derp = ['name: '+user, rel, 'exp: ' + exp, 'level: '+level, 'health: '+health]
-    else: derp = ['name: '+user, rel, _rel, 'exp: ' + exp, 'level: '+level, 'health: '+health]
+    clan = _dict['clan']
+    if _rel == '': derp = ['name: '+user, rel, 'exp: ' + exp, 'level: '+level, 'health: '+health, 'clan: '+clan]
+    else: derp = ['name: '+user, rel, _rel, 'exp: ' + exp, 'level: '+level, 'health: '+health, 'clan: '+clan]
     return '<br/><br/>' + '<br/>'.join(derp)
     
 
@@ -269,11 +341,19 @@ def _buy(arg, user):
             money -= cost
         else:
             return 'you do not have enough money'
-        _dict['inventory']['items'][_name] = 'purchased'              
+        _dict['inventory']['items'][_name] = 'purchased'
+    if arg == 'potion':
+        i = potion_dict[_name].split()
+        cost = int(i[0])
+        cost *= amount
+        if money >= cost:
+            money -= cost
+        else:
+            return 'you do not have enough money'
+        try: _dict['inventory']['potions'][_name] += amount
+        except: _dict['inventory']['potions'][_name] = amount
     _dict['inventory']['money'] = money    
-    exp =_dict['status']['exp']
-    exp += 5
-    _dict['status']['exp'] = exp
+    _dict['status']['exp'] += 5
     rpg_players[user] = json.dumps(_dict)
     dumprpg()
     return 'you bought ' + str(amount) + ' ' + item.replace(' '+str(amount),'')

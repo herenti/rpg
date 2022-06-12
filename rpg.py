@@ -45,16 +45,16 @@ item_dict = {'condom':'it might be used 100',
              'pet tiger':'it might eat you 10000',
              'pet dog':'a loyal companion!!! 500',
              'diamond earring':'sparkles like nothing else 3000',
-             'wedding ring':'for the one you love [for marrying] 10000',
+             'wedding rings':'for the one you love [for marrying] 10000',
              'ethirium pendant':'very rare material of a mysterious nature 100000',
              'royal crest':'those with this crest will now have a royal title 1000000'
              }
              
              
 
-def register(user):
+def _register(user):
     if user not in rpg_players:
-        _status = dict(critmult=1, health=100, level=1, exp=0, accuracy=0.75)
+        _status = dict(critmult=1, health=100, level=1, exp=0, accuracy=0.75, marriage={})
         _inventory = dict(weapons={'unarmed':[1, 'equipped']}, potions={}, items={}, money=150)
         _clan = random.choice(clan_list)
         _dict = dict(status=_status, inventory=_inventory, clan=_clan)
@@ -64,10 +64,99 @@ def register(user):
     else:
         return 'you are already registered'
 
-def attack(user):
+def _attack(user):
     return
 
-def equip(weapon, user):
+def _propose(arg, _user):
+    try:
+        arg, user = arg.split()
+        _dict = json.loads(rpg_players[user])
+        __dict = json.loads(rpg_players[_user])
+        if arg == 'to':
+            proposed = []
+            try:
+                _ret = _dict['status']['marriage']['proposed']
+                proposed += _ret
+            except:
+                pass
+            try:
+                ret = _dict['status']['marriage']['married']
+                return 'that user is already married to ' + ret
+            except:
+                __dict['inventory']['items']['wedding rings']
+                proposed.append(_user)
+                _dict['status']['marriage']['proposed'] = list(set(proposed))
+                try:
+                    ret = __dict['status']['marriage']['proposing']
+                    return 'you are already proposing to ' + ret
+                except:
+                    __dict['status']['marriage']['proposing'] = user
+                    rpg_players[user] = json.dumps(_dict)
+                    rpg_players[_user] = json.dumps(__dict)
+                    dumprpg()
+                    return 'you have proposed to ' + user
+        if arg == 'accept':
+            ret = __dict['status']['marriage']['proposed']
+            if user in ret:
+                __dict['inventory']['items']['wedding rings'] = 'given'
+                try: del __dict['status']['marriage']['proposed']           
+                except: pass
+                try: del _dict['status']['marriage']['proposed']
+                except: pass
+                try: del __dict['status']['marriage']['proposing']
+                except: pass
+                try: del _dict['status']['marriage']['proposing']
+                except: pass
+                for i in rpg_players:
+                    derp = json.loads(rpg_players[i])
+                    try:
+                       if user in derp['status']['marriage']['proposed']:
+                           derp['status']['marriage']['proposed'].remove(user)
+                    except:
+                        pass
+                    try:
+                        if _user in derp['status']['marriage']['proposed']:
+                           derp['status']['marriage']['proposed'].remove(_user)
+                    except:
+                        pass
+                    try:
+                        if derp['status']['marriage']['proposing'] == user or _user:
+                           del derp['status']['marriage']['proposing']
+                    except:
+                        pass
+                    rpg_players[i] = json.dumps(derp)
+                _dict['status']['marriage']['married'] =  _user
+                __dict['status']['marriage']['married'] = user
+                rpg_players[user] = json.dumps(_dict)
+                rpg_players[_user] = json.dumps(__dict)
+                dumprpg()
+                return 'you are now married to ' + user
+            else: return 'they have not proposed to you'
+    except:
+        return 'not vallid'
+
+def rpgstatus(user, _user):
+    user = _user if user == '' else user.lower()
+    _dict = json.loads(rpg_players[user])
+    rel = _dict['status']['marriage']
+    try:
+        proposed_to = rel['proposed']
+        _rel = 'proposed to by: ' + ', '.join(rel['proposed'])
+    except:
+        _rel = ''
+    try:
+        married_to = rel['married']
+        rel = 'married to: ' + married_to
+    except: rel = 'not married'
+    level = str(_dict['status']['level'])
+    exp = str(_dict['status']['exp'])
+    health = str(_dict['status']['health'])
+    if _rel == '': derp = ['name: '+user, rel, 'exp: ' + exp, 'level: '+level, 'health: '+health]
+    else: derp = ['name: '+user, rel, _rel, 'exp: ' + exp, 'level: '+level, 'health: '+health]
+    return '<br/><br/>' + '<br/>'.join(derp)
+    
+
+def _equip(weapon, user):
     _dict = json.loads(rpg_players[user])
     try:
         for i in _dict['inventory']['weapons']:
@@ -81,8 +170,8 @@ def equip(weapon, user):
         return 'equipped ' + weapon
     except:
         return 'you do not have that weapon'
-    
-def buy(arg, user):
+
+def _buy(arg, user):
     try:
         rpg_players[user]
     except:
@@ -113,7 +202,16 @@ def buy(arg, user):
         else:
             return 'you do not have enough money'
         _dict['inventory']['weapons'][_name] = [ammo, 'unequipped']
-        _dict['inventory']['money'] = money
+    if arg == 'item':
+        i = item_dict[_name].split()
+        cost = int(i[-1])
+        cost *= amount
+        if money >= cost:
+            money -= cost
+        else:
+            return 'you do not have enough money'
+        _dict['inventory']['items'][_name] = 'purchased'              
+    _dict['inventory']['money'] = money    
     exp =_dict['status']['exp']
     exp += 5
     _dict['status']['exp'] = exp

@@ -15,7 +15,8 @@ from text import rpg_players
 
 clan_list = ['ethos','verity','regal','burathian','noctuo']
 
-weapon_dict = {'short sword': '100 10 1 1 no 1',
+weapon_dict = {'unarmed': '0 5 1 1 no 1',
+               'short sword': '100 10 1 1 no 1',
                'bow': '100 13 1.5 1 yes 10',
                'dildo': '200 18 1 3 no 1',
                'flintlock pistol': '200 22 1.8 3 yes 10',
@@ -50,11 +51,9 @@ item_dict = {'condom':'it might be used 100',
              'royal crest':'those with this crest will now have a royal title 1000000'
              }
              
-             
-
 def _register(user):
     if user not in rpg_players:
-        _status = dict(critmult=1, health=100, level=1, exp=0, accuracy=0.75, marriage={})
+        _status = dict(critchance=0.07, health=100, level=1, timeout=time.time(), exp=0, accuracy=0.75, marriage={})
         _inventory = dict(weapons={'unarmed':[1, 'equipped']}, potions={}, items={}, money=150)
         _clan = random.choice(clan_list)
         _dict = dict(status=_status, inventory=_inventory, clan=_clan)
@@ -64,7 +63,67 @@ def _register(user):
     else:
         return 'you are already registered'
 
-def _attack(user):
+def _attack(user, _user):
+    _dict = json.loads(rpg_players[user])
+    __dict = json.loads(rpg_players[_user])
+    if __dict['status']['health'] < 1:
+        return 'you are dead. you cannot attack'
+    if _dict['status']['health'] < 1:
+        return 'your opponent is dead. you cannot attack'
+    for i in __dict['inventory']['weapons']:
+        _i = __dict['inventory']['weapons'][i]
+        if _i[1] == 'equipped':
+            weapon = i
+            ammo = _i[0]
+    _stats = weapon_dict[weapon].split()
+    base_damage = int(_stats[1])
+    attack_rate = int(_stats[2])*5
+    if attack_rate > 10000: attack_rate = 10000
+    timeout = time.time() - __dict['status']['timeout']
+    if timeout < attack_rate:
+        return 'you find yourself unable to attack fast enough'
+    needs_ammo = _stats[4]
+    max_damage = base_damage * 3.5
+    accuracy = __dict['status']['accuracy']
+    critchance = __dict['status']['critchance']
+    crit = False
+    killed = False
+    def hit_chance(i):
+        part = i * 100
+        _part = 100 - part
+        part = ['y' for i in range(int(part))]
+        _part = ['n' for i in range(int(_part))]
+        part = part + _part
+        hit = random.choice(part)
+        return hit
+    if hit_chance(accuracy) == 'n':
+        __dict['status']['timeout'] = time.time()
+        return 'you missed!!!'
+    if hit_chance(critchance) == 'y':
+        crit = True
+        max_damage *= 2   
+    min_damage = max_damage * 0.6
+    damage = random.randrange(round(min_damage), round(max_damage))
+    _dict['status']['health'] -= damage
+    _exp = 5
+    level = _dict['status']['level']*2
+    _exp += level
+    if _dict['status']['health'] <= 0:
+        _dict['status']['health'] = 0
+        killed = True
+        level = level*5
+        _exp += level
+    __dict['status']['exp'] += _exp
+    __dict['status']['timeout'] = time.time()        
+    rpg_players[user] = json.dumps(_dict)
+    rpg_players[_user] = json.dumps(__dict)
+    dumprpg()
+    ret = 'attacked ' + user + ' for ' + str(damage)
+    if crit == True: ret = ret + ': critical hit!!!'
+    if killed == True: ret = ret + ': they were killed'
+    return ret
+
+def calc_level(i):
     return
 
 def _propose(arg, _user):
@@ -135,7 +194,7 @@ def _propose(arg, _user):
     except:
         return 'not vallid'
 
-def rpgstatus(user, _user):
+def _rpgstats(user, _user):
     user = _user if user == '' else user.lower()
     _dict = json.loads(rpg_players[user])
     rel = _dict['status']['marriage']

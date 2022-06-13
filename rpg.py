@@ -199,8 +199,8 @@ def _attack(user, _user):
         _dict['status']['health'] = 0
         killed = True
         _exp += _kexp
-        __dict['inventory']['money'] += level*5
-    __dict['inventory']['money'] += level*2
+        __dict['inventory']['money'] += _kexp*10
+    __dict['inventory']['money'] += _exp*10
     __dict['status']['exp'] += _exp
     __dict['status']['attack_timeout'] = time.time()        
     rpg_players[user] = json.dumps(_dict)
@@ -215,20 +215,25 @@ def calc_level(user):
     _dict = json.loads(rpg_players[user])
     exp = _dict['status']['exp']
     _exp = max_health[str(_dict['status']['level'])]
-    if exp > _exp:
-        _left = exp - _exp
-        _dict['status']['exp'] = _left
-        if _dict['status']['level'] >= 100:
-            _dict['status']['level'] = 100
-        else:
-            _dict['status']['level'] += 1
-        level = _dict['status']['level']
-        _health = max_health[str(level)]
-        _dict['status']['health'] = _health
-        if _dict['status']['accuracy'] >= 1:
-            _dict['status']['accuracy'] = 1
-        else: _dict['status']['accuracy'] += 0.0025
-        rpg_players[user] = json.dumps(_dict)
+    while True:
+        if exp > _exp:
+            _left = exp - _exp
+            _dict = json.loads(rpg_players[user])
+            _exp = max_health[str(_dict['status']['level'])]
+            exp -= _exp
+            _dict['status']['exp'] = _left
+            if _dict['status']['level'] >= 100:
+                _dict['status']['level'] = 100
+            else:
+                _dict['status']['level'] += 1
+            level = _dict['status']['level']
+            _health = max_health[str(level)]
+            _dict['status']['health'] = _health
+            if _dict['status']['accuracy'] >= 1:
+                _dict['status']['accuracy'] = 1
+            else: _dict['status']['accuracy'] += 0.0025
+            rpg_players[user] = json.dumps(_dict)
+        else: break
     dumprpg()
 
 def _propose(arg, _user):

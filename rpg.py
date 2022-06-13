@@ -50,6 +50,13 @@ item_dict = {'condom':'it might be used 100',
              'ethirium pendant':'very rare material of a mysterious nature 100000',
              'royal crest':'those with this crest will now have a royal title 1000000'
              }
+
+max_health = {'1': 110, '2': 121, '3': 133, '4': 146, '5': 161, '6': 177, '7': 195, '8': 214, '9': 236, '10': 259, '11': 285, '12': 314, '13': 345, '14': 380, '15': 418, '16': 459, '17': 505, '18': 556, '19': 612, '20': 673, '21': 740, '22': 814, '23': 895, '24': 985,
+              '25': 1083, '26': 1192, '27': 1311, '28': 1442, '29': 1586, '30': 1745, '31': 1919, '32': 2111, '33': 2323, '34': 2555, '35': 2810, '36': 3091, '37': 3400, '38': 3740, '39': 4114, '40': 4526, '41': 4979, '42': 5476, '43': 6024, '44': 6626, '45': 7289, '46': 8018, '47': 8820, '48': 9702, '49': 10672,
+              '50': 11739, '51': 12913, '52': 14204, '53': 15625, '54': 17187, '55': 18906, '56': 20797, '57': 22876, '58': 25164, '59': 27680, '60': 30448, '61': 33493, '62': 36842, '63': 40527, '64': 44579, '65': 49037, '66': 53941, '67': 59335, '68': 65268, '69': 71795, '70': 78975, '71': 86872, '72': 95559, '73': 105115, '74': 115627,
+              '75': 127190, '76': 139908, '77': 153899, '78': 169289, '79': 186218, '80': 204840, '81': 225324, '82': 247856, '83': 272642, '84': 299906, '85': 329897, '86': 362887, '87': 399175, '88': 439093, '89': 483002, '90': 531302, '91': 584432, '92': 642876, '93': 707163, '94': 777880, '95': 855668, '96': 941234, '97': 1035358, '98': 1138894, '99': 1252783, '100': 1378061
+              }
+
     
 def _register(user):
     if user not in rpg_players:
@@ -59,7 +66,7 @@ def _register(user):
         _clan = random.choice(clan_list)
         _dict = dict(status=_status, inventory=_inventory, clan=_clan)
         rpg_players[user] = json.dumps(_dict)
-        dumprpg()
+        calc_level(user)
         return 'registered in clan ' + _clan
     else:
         return 'you are already registered'
@@ -96,11 +103,19 @@ def _potion(arg, user):
             info = potion_dict[item].split()
             effect = info[2]
             val = info [1]
-            if effect =='health': _dict['status']['health'] += int(val)
-            else: _dict['status']['effects'][effect] = [time.time(), val]
+            level = _dict['status']['level']
+            if effect == 'health':
+                amount = _dict['status']['health'] + int(val)
+                _amount = max_health[str(level)]
+                if amount > _amount:
+                    _dict['status']['health'] = _amount
+                else:
+                    _dict['status']['health'] += int(val)
+            else:
+                _dict['status']['effects'][effect] = [time.time(), val]
             _dict['status']['exp'] += 5
             rpg_players[user] = json.dumps(_dict)
-            dumprpg()
+            calc_level(user)
             return 'drank '+item+' potion'
                     
 def _attack(user, _user):
@@ -146,7 +161,7 @@ def _attack(user, _user):
             accuracy += round(float(_accuracy[1]), 1)
     except: pass
     try:
-        _invisibility = _dict['status']['effects']['invisibility']
+        _invisibility, val = _dict['status']['effects']['invisibility']
         _timeout = _invisibility
         _timeout = time.time() - _timeout
         if _timeout > 600:
@@ -157,8 +172,8 @@ def _attack(user, _user):
     crit = False
     killed = False
     def hit_chance(i):
-        part = i * 100
-        _part = 100 - part
+        part = round(i * 10000)
+        _part = 10000 - part
         part = ['y' for i in range(int(part))]
         _part = ['n' for i in range(int(_part))]
         part = part + _part
@@ -168,7 +183,7 @@ def _attack(user, _user):
         __dict['status']['attack_timeout'] = time.time()
         rpg_players[_user] = json.dumps(__dict)
         rpg_players[user] = json.dumps(_dict)
-        dumprpg()
+        calc_level(_user)
         return 'you missed!!!'
     if hit_chance(critchance) == 'y':
         crit = True
@@ -176,26 +191,45 @@ def _attack(user, _user):
     min_damage = max_damage * 0.6
     damage = random.randrange(round(min_damage), round(max_damage))
     _dict['status']['health'] -= damage
-    _exp = 5
-    level = _dict['status']['level']*2
-    _exp += level
+    level = _dict['status']['level']
+    _level = __dict['status']['level']
+    _kexp = round(max_health[str(level)]/random.choice([12,11,13]))
+    _exp = round(max_health[str(_level)]/random.choice(range(30,35))) 
     if _dict['status']['health'] <= 0:
         _dict['status']['health'] = 0
         killed = True
-        level = level*5
-        _exp += level
+        _exp += _kexp
+        __dict['inventory']['money'] += level*5
+    __dict['inventory']['money'] += level*2
     __dict['status']['exp'] += _exp
     __dict['status']['attack_timeout'] = time.time()        
     rpg_players[user] = json.dumps(_dict)
     rpg_players[_user] = json.dumps(__dict)
-    dumprpg()
+    calc_level(_user)
     ret = 'attacked ' + user + ' for ' + str(damage)
     if crit == True: ret = ret + ': critical hit!!!'
     if killed == True: ret = ret + ': they were killed'
     return ret
 
-def calc_level(i):
-    return
+def calc_level(user):
+    _dict = json.loads(rpg_players[user])
+    exp = _dict['status']['exp']
+    _exp = max_health[str(_dict['status']['level'])]
+    if exp > _exp:
+        _left = exp - _exp
+        _dict['status']['exp'] = _left
+        if _dict['status']['level'] >= 100:
+            _dict['status']['level'] = 100
+        else:
+            _dict['status']['level'] += 1
+        level = _dict['status']['level']
+        _health = max_health[str(level)]
+        _dict['status']['health'] = _health
+        if _dict['status']['accuracy'] >= 1:
+            _dict['status']['accuracy'] = 1
+        else: _dict['status']['accuracy'] += 0.0025
+        rpg_players[user] = json.dumps(_dict)
+    dumprpg()
 
 def _propose(arg, _user):
     try:
@@ -223,7 +257,7 @@ def _propose(arg, _user):
                     __dict['status']['marriage']['proposing'] = user
                     rpg_players[user] = json.dumps(_dict)
                     rpg_players[_user] = json.dumps(__dict)
-                    dumprpg()
+                    calc_level(_user)
                     return 'you have proposed to ' + user
         if arg == 'accept':
             ret = __dict['status']['marriage']['proposed']
@@ -257,9 +291,12 @@ def _propose(arg, _user):
                     rpg_players[i] = json.dumps(derp)
                 _dict['status']['marriage']['married'] =  _user
                 __dict['status']['marriage']['married'] = user
+                _dict['status']['exp'] += 5000
+                __dict['status']['exp'] += 5000
                 rpg_players[user] = json.dumps(_dict)
                 rpg_players[_user] = json.dumps(__dict)
-                dumprpg()
+                calc_level(_user)
+                calc_level(user)
                 return 'you are now married to ' + user
             else: return 'they have not proposed to you'
     except:
@@ -296,8 +333,9 @@ def _equip(weapon, user):
                 _dict['inventory']['weapons'][i].append('unequipped')
         _dict['inventory']['weapons'][weapon].remove('unequipped')
         _dict['inventory']['weapons'][weapon].append('equipped')
+        _dict['status']['exp'] += 5
         rpg_players[user] = json.dumps(_dict)
-        dumprpg()
+        calc_level(user)
         return 'equipped ' + weapon
     except:
         return 'you do not have that weapon'
@@ -353,9 +391,9 @@ def _buy(arg, user):
         try: _dict['inventory']['potions'][_name] += amount
         except: _dict['inventory']['potions'][_name] = amount
     _dict['inventory']['money'] = money    
-    _dict['status']['exp'] += 5
+    _dict['status']['exp'] += 5*level
     rpg_players[user] = json.dumps(_dict)
-    dumprpg()
+    calc_level(user)
     return 'you bought ' + str(amount) + ' ' + item.replace(' '+str(amount),'')
 
 def dumprpg():

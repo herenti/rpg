@@ -5,27 +5,29 @@ import urllib.parse
 import urllib.request
 import re
 
-'''
-    for i in weapon_list:
-        i[0] price
-        i[1] damage
-        i[2] rate
-        i[3] level
-        i[4] needs ammo
-        i[5] starting ammo
-'''
+rpg_players = dict()
+f = open('rpg.txt', 'r')
+print('Loading rpg...')
+for line in f.readlines():
+        try:
+                if len(line) > 0:
+                        user, _dict = json.loads(line.strip())
+                        rpg_players[user] = json.dumps(_dict)        
+        except Exception as e:
+                print("Could not load rpg: %s" % e)
+f.close()
 
 clan_list = ['ethos','verity','regal','burathian','noctuo']
 
-weapon_dict = {'unarmed': '0 5 1 1 no 1',
-               'short sword': '100 10 1 1 no 1',
-               'bow': '100 13 1.5 1 yes 10',
-               'dildo': '200 18 1 3 no 1',
-               'flintlock pistol': '200 22 1.8 3 yes 10',
-               'nuke': '1000000 1000000 10000 50 yes 1',
-               'jizz': '0 1 0.1 1 yes 1',
-               'orc penis': '500 38 1 6 no 1',
-               'fury bow': '500 45 1.6 6 yes 10'
+weapon_dict = {'unarmed': '0 5 1 1 no 1 mele',
+               'short sword': '100 10 1 1 no 1 mele',
+               'bow': '100 13 2.5 1 yes 10 ranged',
+               'dildo': '200 18 1 3 no 1 mele',
+               'flintlock pistol': '200 24 2.8 3 yes 10 ranged',
+               'nuke': '1000000 1000000 10000 50 yes 1 ranged',
+               'jizz': '0 1 0.1 1 yes 1 ranged',
+               'orc penis': '500 38 1 6 no 1 mele',
+               'fury bow': '500 45 2.5 6 yes 10 ranged'
                }
 
 potion_dict = {'health s': '20 25 health',
@@ -58,23 +60,11 @@ max_health = {'1': 110, '2': 121, '3': 133, '4': 146, '5': 161, '6': 177, '7': 1
               '50': 11739, '51': 12913, '52': 14204, '53': 15625, '54': 17187, '55': 18906, '56': 20797, '57': 22876, '58': 25164, '59': 27680, '60': 30448, '61': 33493, '62': 36842, '63': 40527, '64': 44579, '65': 49037, '66': 53941, '67': 59335, '68': 65268, '69': 71795, '70': 78975, '71': 86872, '72': 95559, '73': 105115, '74': 115627,
               '75': 127190, '76': 139908, '77': 153899, '78': 169289, '79': 186218, '80': 204840, '81': 225324, '82': 247856, '83': 272642, '84': 299906, '85': 329897, '86': 362887, '87': 399175, '88': 439093, '89': 483002, '90': 531302, '91': 584432, '92': 642876, '93': 707163, '94': 777880, '95': 855668, '96': 941234, '97': 1035358, '98': 1138894, '99': 1252783, '100': 1378061
               }
-
-rpg_players = dict()
-f = open('rpg.txt', 'r')
-print('Loading rpg...')
-for line in f.readlines():
-    try:
-        if len(line) > 0:
-            user, _dict = json.loads(line.strip())
-            rpg_players[user] = json.dumps(_dict)        
-    except Exception as e:
-        print("Could not load rpg: %s" % e)
-f.close()
     
-def _register(user):
+def _register(x, user, uid, roomname, othervars):
     if user not in rpg_players:
-        _status = dict(critchance=0.07, health=100, level=1, attack_timeout=time.time(), exp=0, accuracy=0.75, marriage={}, effects={})
-        _inventory = dict(weapons={'unarmed':[1, 'equipped']}, potions={}, items={}, money=150)
+        _status = dict(critchance=0.07, health=110, level=1, attack_timeout=time.time(), exp=0, accuracy=0.75, marriage={}, effects={})
+        _inventory = dict(weapons={'unarmed':['equipped', 1]}, potions={}, items={}, money=150)
         skills = dict()
         _clan = random.choice(clan_list)
         _dict = dict(status=_status, inventory=_inventory, clan=_clan)
@@ -84,7 +74,7 @@ def _register(user):
     else:
         return 'you are already registered'
 
-def _item(arg, user):
+def _item(arg, user, uid, roomname, othervars):
     try:
         try:
             _dict = json.loads(rpg_players[user])
@@ -95,21 +85,27 @@ def _item(arg, user):
         try: arg, item = arg.split(' ',1)
         except: arg, item = arg, ''
         if arg == 'list':
-            i = title+'your items are: '+', '.join([i for i in _dict['inventory']['items']])
+            i = ', '.join([i+': cost-'+item_dict[i].split()[-1] for i in item_dict])
             return i
-        if arg == 'info':
+        elif arg == 'mylist':
+            if len([i for i in _dict['inventory']['items']]) > 0:
+                i = title+'your items are: '+', '.join([i for i in _dict['inventory']['items']])
+                return i
+            else: return title+'you have no items'
+        elif arg == 'info':
             _item = ' '.join(item_dict[item].split()[:-1])
             return item+': '+_item
     except: return 'invallid'
 
-def _potion(arg, user):
+def _potion(arg, user, uid, roomname, othervars):
     try:
         _dict = json.loads(rpg_players[user])
     except:
         return 'you are not registered yet'
     try: title = _dict['title'] + ', '
     except: title = ''
-    arg, item = arg.split(' ',1)
+    try: arg, item = arg.split(' ',1)
+    except: pass
     if arg == 'drink':
         if _dict['inventory']['potions'][item] <= 0:
             return title+'you are out of that potion'
@@ -134,10 +130,35 @@ def _potion(arg, user):
             rpg_players[user] = json.dumps(_dict)
             calc_level(user)
             return title+'you drank: ['+item+' potion]'
+    elif arg == 'list':
+        return ', '.join([i+': cost - '+potion_dict[i].split()[0] for i in potion_dict])
+    elif arg == 'mylist':
+        try: return ', '.join([i+': supply - '+_dict['inventory']['potions'][i] for i in _dict['inventory']['potions']])
+        except: return 'no potions'
+        
+def _weapon(arg, user, uid, roomname, othervars):
+    try:  _dict = json.loads(rpg_players[user])
+    except: return 'you are not registered yet'
+    try: arg, item = arg.split(' ',1)
+    except: pass
+    if arg == 'list':
+        return ', '.join([i+': cost-'+weapon_dict[i].split()[0] for i in weapon_dict])
+    elif arg == 'mylist':
+        derp = []
+        for i in _dict['inventory']['weapons']:
+            n = '['
+            n+= i+' - '+_dict['inventory']['weapons'][i][0]
+            if weapon_dict[i].split()[6] == 'ranged':
+                n += ': ammo-'+str(_dict['inventory']['weapons'][i][1])
+            n += ']'
+            derp.append(n)
+        return ', '.join(derp)
                     
-def _attack(user, _user):
-    _dict = json.loads(rpg_players[user])
-    __dict = json.loads(rpg_players[_user])
+def _attack(user, _user, uid, roomname, othervars):
+    try: __dict = json.loads(rpg_players[_user])
+    except: return 'you are not registered yet'
+    try:  _dict = json.loads(rpg_players[user])
+    except: return 'they are not registered yet'
     try: _title = __dict['title']+ ', '
     except: _title = ''
     try: title = _dict['title']
@@ -148,12 +169,15 @@ def _attack(user, _user):
         return _title+tile+' is dead. you cannot attack'
     for i in __dict['inventory']['weapons']:
         _i = __dict['inventory']['weapons'][i]
-        if _i[1] == 'equipped':
+        if _i[0] == 'equipped':
             weapon = i
-            ammo = _i[0]
+            ammo = _i[1]
+            break
+    if ammo <= 0: return _title+'you are out of ammo'
     _stats = weapon_dict[weapon].split()
     base_damage = int(_stats[1])
-    attack_rate = int(_stats[2])*5
+    attack_rate = float(_stats[2])*5
+    wtype = _stats[6]
     if attack_rate > 10000: attack_rate = 10000
     timeout = time.time() - __dict['status']['attack_timeout']
     if timeout < attack_rate:
@@ -208,7 +232,16 @@ def _attack(user, _user):
         return _title+'you missed!!!'
     if hit_chance(critchance) == 'y':
         crit = True
-        max_damage *= 2   
+        max_damage *= 2
+    if wtype == 'ranged':
+        for i in __dict['inventory']['weapons']:
+            _i = __dict['inventory']['weapons'][i]
+            if _i[0] == 'equipped':
+                _ammo = _i[1]
+                ammo -= 1
+                if ammo <= 0: ammo = 0
+                _i.remove(_ammo)
+                _i.append(ammo)        
     min_damage = max_damage * 0.6
     damage = random.randrange(round(min_damage), round(max_damage))
     _dict['status']['health'] -= damage
@@ -227,7 +260,7 @@ def _attack(user, _user):
     rpg_players[user] = json.dumps(_dict)
     rpg_players[_user] = json.dumps(__dict)
     calc_level(_user)
-    ret = _title+'you attacked ' + title + ' for ' + str(damage)+' damage'
+    ret = _title+'you attacked ' + title + ' for ' + str(damage)+' damage. their health: '+ str(_dict['status']['health'])
     if crit == True: ret = ret + ': critical hit!!!'
     if killed == True: ret = ret + ': '+title+' was killed'
     return ret
@@ -257,7 +290,7 @@ def calc_level(user):
         else: break
     dumprpg()
 
-def _propose(arg, _user):
+def _propose(arg, _user, uid, roomname, othervars):
     try:
         arg, user = arg.split()
         _dict = json.loads(rpg_players[user])
@@ -336,8 +369,12 @@ def _propose(arg, _user):
     except:
         return 'not vallid'
 
-def _rpgstats(user, _user):
+def _rpgstats(user, _user, uid, roomname, othervars):
     user = _user if user == '' else user.lower()
+    try:
+        rpg_players[user]
+    except:
+        return 'you/they are not registered yet'
     _dict = json.loads(rpg_players[user])
     rel = _dict['status']['marriage']
     try: _title_ = _dict['title']
@@ -362,22 +399,27 @@ def _rpgstats(user, _user):
     exp = str(_dict['status']['exp'])
     health = str(_dict['status']['health'])
     clan = _dict['clan']
-    if _rel == '': derp = ['name: '+_title_, rel, 'exp: ' + exp, 'level: '+level, 'health: '+health, 'clan: '+clan]
-    else: derp = ['name: '+_title_, rel, _rel, 'exp: ' + exp, 'level: '+level, 'health: '+health, 'clan: '+clan]
-    return '<br/><br/>' + '<br/>'.join(derp)
+    money = _dict['inventory']['money']
+    if _rel == '': derp = ['name: '+_title_, rel, 'exp: ' + exp, 'level: '+level, 'health: '+health, 'clan: '+clan, 'money: '+str(money)]
+    else: derp = ['name: '+_title_, rel, _rel, 'exp: ' + exp, 'level: '+level, 'health: '+health, 'clan: '+clan, 'money: '+str(money)]
+    return '<br/><br/><br/>' + '<br/>'.join(derp)
     
 
-def _equip(weapon, user):
+def _equip(weapon, user, uid, roomname, othervars):
+    try:
+        rpg_players[user]
+    except:
+        return 'you are not registered yet'
     _dict = json.loads(rpg_players[user])
     try: _title = _dict['title'] + ', '
     except: _title = ''
     try:
         for i in _dict['inventory']['weapons']:
-            if _dict['inventory']['weapons'][i][1] == 'equipped':
-                _dict['inventory']['weapons'][i].remove('equipped')
-                _dict['inventory']['weapons'][i].append('unequipped')
-        _dict['inventory']['weapons'][weapon].remove('unequipped')
-        _dict['inventory']['weapons'][weapon].append('equipped')
+            if _dict['inventory']['weapons'][i][0] == 'equipped':
+                ammo = _dict['inventory']['weapons'][i][1]
+                _dict['inventory']['weapons'][i] = ['unequipped', ammo]
+        ammo = _dict['inventory']['weapons'][weapon][1]
+        _dict['inventory']['weapons'][weapon] = ['equipped', ammo]
         _dict['status']['exp'] += 5
         rpg_players[user] = json.dumps(_dict)
         calc_level(user)
@@ -385,7 +427,7 @@ def _equip(weapon, user):
     except:
         return _title+'you do not have that weapon'
 
-def _buy(arg, user):
+def _buy(arg, user, uid, roomname, othervars):
     try:
         rpg_players[user]
     except:
@@ -417,7 +459,7 @@ def _buy(arg, user):
             money -= cost
         else:
             return _title+'you do not have enough money'
-        _dict['inventory']['weapons'][_name] = [ammo, 'unequipped']
+        _dict['inventory']['weapons'][_name] = ['unequipped', ammo]
     if arg == 'item':
         i = item_dict[_name].split()
         cost = int(i[-1])
@@ -457,17 +499,3 @@ def dumprpg():
            _dict = json.loads(rpg_players[i])
            f.write(json.dumps([i,_dict])+"\n")                                        
     f.close()
-
-def gender(x):
-    x = x.lower()
-    try: resp = urllib.request.urlopen("http://st.chatango.com/profileimg/%s/%s/%s/mod1.xml" % (x[0], x[1], x))
-    except: resp = urllib.request.urlopen("http://st.chatango.com/profileimg/%s/%s/%s/mod1.xml" % (x[0], x[0], x))
-    try: data = resp.read().decode()
-    except: data = resp.read().decode('latin-1')
-    try: ru = re.compile(r'<s>(.*?)</s>', re.IGNORECASE).search(data).group(1)
-    except: ru = "?"
-    ret = urllib.parse.unquote(ru)
-    if ret == "M": r = "him"
-    elif ret == "F": r = "her"
-    elif ret == "?": r = "them"        
-    return r

@@ -21,13 +21,13 @@ clan_list = ['ethos','verity','regal','burathian','noctuo']
 
 weapon_dict = {'unarmed': '0 5 1 1 no 1 mele',
                'short sword': '100 10 1 1 no 1 mele',
-               'bow': '100 13 2.5 1 yes 10 ranged',
+               'bow': '100 13 2 1 yes 10 ranged',
                'dildo': '200 18 1 3 no 1 mele',
-               'flintlock pistol': '200 24 2.8 3 yes 10 ranged',
+               'flintlock pistol': '200 24 2 3 yes 10 ranged',
                'nuke': '1000000 1000000 10000 50 yes 1 ranged',
                'jizz': '0 1 0.1 1 yes 1 ranged',
                'orc penis': '500 38 1 6 no 1 mele',
-               'fury bow': '500 45 2.5 6 yes 10 ranged'
+               'fury bow': '500 45 2 6 yes 10 ranged'
                }
 
 potion_dict = {'health s': '20 25 health',
@@ -253,8 +253,8 @@ def _attack(user, _user, uid, roomname, othervars):
         _dict['status']['health'] = 0
         killed = True
         _exp += _kexp
-        __dict['inventory']['money'] += _kexp*10
-    __dict['inventory']['money'] += _exp*10
+        __dict['inventory']['money'] += _exp*2
+    __dict['inventory']['money'] += _exp*2
     __dict['status']['exp'] += _exp
     __dict['status']['attack_timeout'] = time.time()        
     rpg_players[user] = json.dumps(_dict)
@@ -460,7 +460,7 @@ def _buy(arg, user, uid, roomname, othervars):
         else:
             return _title+'you do not have enough money'
         _dict['inventory']['weapons'][_name] = ['unequipped', ammo]
-    if arg == 'item':
+    elif arg == 'item':
         i = item_dict[_name].split()
         cost = int(i[-1])
         cost *= amount
@@ -475,7 +475,7 @@ def _buy(arg, user, uid, roomname, othervars):
             elif _gender == 'them': title = 'your grace: '+user
             _dict['title'] = title
         _dict['inventory']['items'][_name] = 'purchased'
-    if arg == 'potion':
+    elif arg == 'potion':
         i = potion_dict[_name].split()
         cost = int(i[0])
         cost *= amount
@@ -485,17 +485,37 @@ def _buy(arg, user, uid, roomname, othervars):
             return _title+'you do not have enough money'
         try: _dict['inventory']['potions'][_name] += amount
         except: _dict['inventory']['potions'][_name] = amount
+    elif arg == 'ammo':
+        i = weapon_dict[_name].split()
+        need_ammo = i[4]
+        if need_ammo == 'yes':
+            if _name == 'nuke':
+                cost = int(i[0])
+                _amount = 10
+            else:
+                cost = int(i[0])/10
+                _amount = 10
+            cost *= amount
+            amount *= _amount
+            money -= cost
+            try:
+                equipped, pammo = _dict['inventory']['weapons'][_name]
+                pammo += amount
+                _dict['inventory']['weapons'][_name] = [equipped, pammo]
+            except: return 'you dont have that weapon'            
     _dict['inventory']['money'] = money    
-    _dict['status']['exp'] += 5*level
+    _dict['status']['exp'] += 3*level
     rpg_players[user] = json.dumps(_dict)
     calc_level(user)
     try: _title = _dict['title'] + ', '
     except: _title = ''
-    return _title+'you bought ' + str(amount) + ' ' + _name
+    return _title+'you bought ' + str(amount) + ' ' + _name + ' '+ arg
 
 def dumprpg():
+    print('saving')
     f = open("rpg.txt", "w")
     for i in rpg_players:
            _dict = json.loads(rpg_players[i])
            f.write(json.dumps([i,_dict])+"\n")                                        
     f.close()
+    print('saving done')
